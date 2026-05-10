@@ -4,10 +4,10 @@ import urllib.parse
 import requests
 from playwright.sync_api import sync_playwright
 
-# Konfiguracja
+# Konfiguracja - ZABEZPIECZENIE PRZED BŁĘDNYM FORMATEM URL
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
-SUPABASE_URL = os.getenv("SUPABASE_URL")
+SUPABASE_URL = os.getenv("SUPABASE_URL", "").rstrip("/") # Automatycznie usuwa znak "/" na końcu
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 SCRAPERAPI_KEY = os.getenv("SCRAPERAPI_KEY")
 
@@ -29,10 +29,13 @@ def is_new_offer(offer_url):
     headers = {"apikey": SUPABASE_KEY, "Authorization": f"Bearer {SUPABASE_KEY}"}
     params = {"url": f"eq.{offer_url}", "select": "id"}
     try:
-        response = requests.get(f"{SUPABASE_URL}/rest/v1/offers", headers=headers, params=params)
+        # Pukamy do konkretnej tabeli "offers"
+        endpoint = f"{SUPABASE_URL}/rest/v1/offers"
+        response = requests.get(endpoint, headers=headers, params=params)
+        
         if response.status_code != 200:
-            print(f"BŁĄD SUPABASE (is_new): {response.status_code} - {response.text}")
-            return False # Jeśli baza nie odpowiada, zakładamy że nie jest nowa (bezpiecznik przed spamem)
+            print(f"BŁĄD SUPABASE (is_new): URL: {endpoint} | Kod: {response.status_code} | {response.text}")
+            return False 
         
         data = response.json()
         return len(data) == 0
