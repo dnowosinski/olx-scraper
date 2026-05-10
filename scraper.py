@@ -8,6 +8,7 @@ TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
+SCRAPERAPI_KEY = os.getenv("SCRAPERAPI_KEY")
 
 def send_telegram(offer):
     url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
@@ -36,8 +37,16 @@ def save_offer(offer):
 
 def scrape():
     with sync_playwright() as p:
+        # Konfiguracja proxy z użyciem ScraperAPI
+        proxy_settings = {
+            "server": "http://proxy-server.scraperapi.com:8001",
+            "username": "scraperapi", # To słowo zostaw bez zmian, to login usługi
+            "password": SCRAPERAPI_KEY # Tu ładuje się Twój ukryty klucz
+        }
+
         browser = p.chromium.launch(
-            headless=True, # Na GitHub Actions to musi być True
+            headless=True,
+            proxy=proxy_settings, # <--- PRZEKAZUJEMY PROXY DO PRZEGLĄDARKI
             args=["--disable-blink-features=AutomationControlled"]
         )
         context = browser.new_context(
@@ -45,6 +54,7 @@ def scrape():
             user_agent='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36'
         )
         page = context.new_page()
+
         page.add_init_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
         
         target_url = "https://www.olx.pl/oferty/q-playstation-5/?search%5Bfilter_float_price:from%5D=900&search%5Bfilter_float_price:to%5D=1300&search%5Bfilter_enum_version%5D%5B0%5D=playstation5"
