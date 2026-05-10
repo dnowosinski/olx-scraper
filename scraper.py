@@ -1,9 +1,10 @@
 import os
 import re
+import urllib.parse
 import requests
 from playwright.sync_api import sync_playwright
 
-# Konfiguracja z Sekretów GitHub
+# --- KONFIGURACJA ZMIENNYCH ---
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
 SUPABASE_URL = os.getenv("SUPABASE_URL")
@@ -36,17 +37,15 @@ def save_offer(offer):
     requests.post(f"{SUPABASE_URL}/rest/v1/offers", headers=headers, json=offer)
 
 def scrape():
-    with sync_playwright() as p:
-        # Konfiguracja proxy z użyciem ScraperAPI
-        proxy_settings = {
-            "server": "http://proxy-server.scraperapi.com:8001",
-            "username": "scraperapi", # To słowo zostaw bez zmian, to login usługi
-            "password": SCRAPERAPI_KEY # Tu ładuje się Twój ukryty klucz
-        }
+    # Zabezpieczenie: Sprawdzamy czy klucz na pewno się załadował z GitHuba
+    if not SCRAPERAPI_KEY:
+        print("BŁĄD KRYTYCZNY: Brak klucza SCRAPERAPI_KEY. Sprawdź plik .yml!")
+        return
 
+    with sync_playwright() as p:
+        # CZYSTE URUCHOMIENIE - bez parametru proxy
         browser = p.chromium.launch(
             headless=True,
-            proxy=proxy_settings, # <--- PRZEKAZUJEMY PROXY DO PRZEGLĄDARKI
             args=["--disable-blink-features=AutomationControlled"]
         )
         context = browser.new_context(
@@ -54,24 +53,28 @@ def scrape():
             user_agent='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36'
         )
         page = context.new_page()
-
         page.add_init_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
         
         target_url = "https://www.olx.pl/oferty/q-playstation-5/?search%5Bfilter_float_price:from%5D=900&search%5Bfilter_float_price:to%5D=1300&search%5Bfilter_enum_version%5D%5B0%5D=playstation5"
         
-        print("Otwieram listę wyszukiwania...")
-        page.goto(target_url, wait_until="domcontentloaded")
+        # MAGIA SCRAPERAPI: Kodujemy URL OLXa i doklejamy go do API ScraperAPI z flagą render=true
+        encoded_url = urllib.parse.quote(target_url)
+        scraper_url = f"http://api.scraperapi.com/?api_key={SCRAPERAPI_KEY}&url={encoded_url}&render=true"
         
-        page.wait_for_timeout(3000)
-
-        print(f"Tytuł wczytanej strony: {page.title()}")
+        print("Otwieram ScraperAPI, proszę czekać...")
         
-        # Pętla scrollująca, aby upewnić się, że karta i obrazki się załadowały
+        # WAŻNE: Zwiększamy timeout do 60 sekund, bo ScraperAPI potrzebuje chwili na obejście zabezpieczeń
+        page.goto(scraper_url, wait_until="domcontentloaded", timeout=60000)
+        
+        print(f"Tytuł załadowanej strony: {page.title()}")
+        
+        # Pętla scrollująca
         for _ in range(3):
             page.mouse.wheel(0, 800)
             page.wait_for_timeout(400)
         
         cards = page.locator('div[data-cy="l-card"]').all()
+        print(f"Znaleziono {len(cards)} kart z ofertami.")
         
         # Sprawdzamy tylko top 10 ogłoszeń z góry (przy uruchamianiu co godzinę to z zapasem wystarczy)
         for card in cards[:10]: 
