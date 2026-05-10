@@ -51,7 +51,10 @@ def scrape():
         
         print("Otwieram listę wyszukiwania...")
         page.goto(target_url, wait_until="domcontentloaded")
+        
         page.wait_for_timeout(3000)
+
+        print(f"Tytuł wczytanej strony: {page.title()}")
         
         # Pętla scrollująca, aby upewnić się, że karta i obrazki się załadowały
         for _ in range(3):
