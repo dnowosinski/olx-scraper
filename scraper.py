@@ -71,7 +71,7 @@ def scrape():
         cards = page.locator('div[data-cy="l-card"]').all()
         print(f"Znaleziono {len(cards)} kart. Przystępuję do analizy...")
         
-        for i, card in enumerate(cards[:10]):
+        for i, card in enumerate(cards):
             try:
                 link_elem = card.locator('a').first
                 href = link_elem.get_attribute('href')
